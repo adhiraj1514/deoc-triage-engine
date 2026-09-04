@@ -44,7 +44,7 @@
         }
         @keyframes pulse-yellow { to { box-shadow: 0 0 0 15px rgba(234, 179, 8, 0); } }
 
-        /* Hide Scrollbar for sleekness */
+        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
@@ -64,12 +64,12 @@
                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
             </div>
             <div>
-                <h1 class="text-lg font-black tracking-widest text-white uppercase">TAC-COM <span class="text-slate-500 font-medium tracking-normal ml-2">NDRF Disaster Response - DEOC Operations</span></h1>
+                <h1 class="text-lg font-black tracking-widest text-white uppercase">TAC-COM <span class="text-slate-500 font-medium tracking-normal ml-2">NDRF Disaster Response - Talegaon Dabhade</span></h1>
             </div>
         </div>
         <div class="flex items-center gap-4">
             <div id="feed-status" class="flex items-center gap-2 px-3 py-1 bg-slate-900/80 border border-slate-700/50 rounded-full text-xs font-mono text-slate-300 transition-colors duration-300">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Auto-Feed Active
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Initializing Cloud Link...
             </div>
             <div class="text-right">
                 <div id="clock" class="text-xl font-bold font-mono text-white tracking-wider">00:00:00 IST</div>
@@ -212,11 +212,6 @@
         let payloadIndex = 0;
 
         async function autoPollFeed() {
-            // Visual indicator blink
-            const statusBadge = document.getElementById("feed-status");
-            statusBadge.classList.add("bg-emerald-900/80");
-            setTimeout(() => statusBadge.classList.remove("bg-emerald-900/80"), 500);
-
             // Accumulate payloads over time to simulate growing emergency
             let combinedPayload = [];
             for (let i = 0; i <= payloadIndex; i++) {
@@ -224,7 +219,8 @@
             }
             
             try {
-                const response = await fetch("http://127.0.0.1:8000/api/ingest", {
+                // RELATIVE PATH FOR CLOUD DEPLOYMENT
+                const response = await fetch("/api/ingest", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(combinedPayload)
@@ -236,15 +232,18 @@
                     updateMapMarkers(globalClusters);
                     renderClusters(globalClusters);
                     
-                    if(payloadIndex === 0) addLogEntry("Automated ingestion stream initiated.", "blue");
+                    document.getElementById("feed-status").innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Cloud Sync Active`;
+                    
+                    if(payloadIndex === 0) addLogEntry("Cloud ingestion stream synchronized.", "blue");
                     if(payloadIndex < mockPayloads.length - 1) payloadIndex++;
                 }
             } catch (err) {
-                console.error("Backend offline. Auto-polling will retry.");
+                document.getElementById("feed-status").innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Resilient Mode`;
+                console.error("Cloud sync retry in progress...");
             }
         }
 
-        // Start Auto-polling every 5 seconds for rapid testing
+        // Start Auto-polling every 5 seconds
         setTimeout(autoPollFeed, 1000);
         setInterval(autoPollFeed, 5000);
         // --------------------------------
@@ -280,7 +279,6 @@
 
                 const marker = L.marker([c.latitude, c.longitude], { icon: customPin });
                 
-                // When marker is clicked, populate the Right Panel Inspector
                 marker.on('click', () => {
                     selectCluster(c);
                     map.flyTo([c.latitude, c.longitude], 17, { duration: 1.5 });
@@ -305,7 +303,6 @@
             document.getElementById("panel-hazard").innerText = c.hazard_type;
             document.getElementById("panel-victims").innerText = c.estimated_victims;
             
-            // Priority Styling
             const prioBadge = document.getElementById("panel-priority");
             prioBadge.innerText = c.priority_level;
             prioBadge.className = "px-2 py-1 text-[10px] font-bold rounded uppercase tracking-wider border ";
@@ -313,7 +310,6 @@
             else if (c.priority_level.includes("High")) prioBadge.className += "bg-orange-500/20 text-orange-400 border-orange-500/50";
             else prioBadge.className += "bg-yellow-500/20 text-yellow-400 border-yellow-500/50";
 
-            // Infer Help Needed & ETR
             let help = "General Rescue";
             let etr = "00:45 MINS";
             let hazardLow = c.hazard_type.toLowerCase();
@@ -323,21 +319,16 @@
             document.getElementById("panel-help").innerText = help;
             document.getElementById("panel-etr").innerText = etr;
 
-            // Integrity Logic
             let integrityText = "Original - Verified by single node.";
             if (c.total_reports > 1) {
                 integrityText = `Verified Original - Corroborated by ${c.total_reports} independent reporting nodes. Bot probability < 2%.`;
             }
             document.getElementById("panel-integrity").innerText = integrityText;
-
-            // Time logic
             document.getElementById("panel-time").innerText = "First report received approx 2-5 mins ago via WhatsApp API.";
 
-            // Reset Dispatch Buttons
             cancelDispatch();
         }
 
-        // --- DISPATCH LOGIC ---
         function initiateDispatch() {
             document.getElementById("btn-dispatch").classList.add("hidden");
             document.getElementById("dispatch-confirm").classList.remove("hidden");
@@ -351,20 +342,16 @@
         function confirmDispatch() {
             addLogEntry(`Units dispatched for ${selectedClusterId}. Status: En Route.`, "emerald");
             
-            // UI Feedback
             const btnContainer = document.getElementById("dispatch-confirm");
             btnContainer.innerHTML = `<div class="w-full bg-emerald-900/50 border border-emerald-500/50 text-emerald-400 text-center font-bold py-3 rounded-xl text-xs tracking-widest uppercase">DISPATCH SUCCESSFUL</div>`;
             
             setTimeout(() => {
-                // Reset after 3 seconds
                 btnContainer.classList.add("hidden");
                 btnContainer.innerHTML = `
                     <button onclick="confirmDispatch()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition duration-200 shadow-lg shadow-emerald-900/50 text-xs tracking-widest uppercase">Confirm</button>
                     <button onclick="cancelDispatch()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl transition duration-200 text-xs tracking-widest uppercase">Abort</button>
                 `;
                 document.getElementById("btn-dispatch").classList.remove("hidden");
-                
-                // Deselect cluster visually
                 document.getElementById("inspector-overlay").classList.remove("hidden");
                 selectedClusterId = null;
             }, 3000);
@@ -377,7 +364,6 @@
             logContainer.insertAdjacentHTML('afterbegin', html);
         }
 
-        // --- LEFT PANEL RENDER ---
         function renderClusters(clusters) {
             const container = document.getElementById("clusters-container");
             container.innerHTML = "";
