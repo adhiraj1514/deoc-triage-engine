@@ -1,4 +1,10 @@
 import os
+import sys
+
+# --- FIX FOR CLOUD DEPLOYMENT IMPORTS ---
+# This tells the server to look inside the 'backend' folder for your other Python files
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
